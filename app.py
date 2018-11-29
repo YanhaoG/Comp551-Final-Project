@@ -33,33 +33,40 @@ def load_data_and_labels(positive_data_file, negative_data_file):
     return [X, y]
 
 def data_process():
-	X, y = load_data_and_labels(
-	    "./data/rt-polaritydata/rt-polarity.pos", "./data/rt-polaritydata/rt-polarity.neg")
-	max_document_length = max([len(x.split(" ")) for x in X])
-	vocab_processor = learn.preprocessing.VocabularyProcessor(max_document_length)
-	X = np.array(list(vocab_processor.fit_transform(X)))
+    X, y = load_data_and_labels("./data/rt-polaritydata/rt-polarity.pos", "./data/rt-polaritydata/rt-polarity.neg")
+    max_document_length = max([len(x.split(" ")) for x in X])
+    vocab_processor = learn.preprocessing.VocabularyProcessor(max_document_length)
+    temp_X = np.array(list(vocab_processor.fit_transform(X)))
 
-	# Randomly shuffle data
-	np.random.seed(10)
-	shuffle_indices = np.random.permutation(np.arange(len(y)))
-	x_shuffled = X[shuffle_indices]
-	y_shuffled = y[shuffle_indices]
-
-	# Split train/test set
-	# TODO: This is very crude, should use cross-validation
-	dev_sample_index = -1 * int(0.1 * float(len(y)))
-	x_train, x_val = x_shuffled[:dev_sample_index], x_shuffled[dev_sample_index:]
-	y_train, y_val = y_shuffled[:dev_sample_index], y_shuffled[dev_sample_index:]
-
-	print("Vocabulary Size: {:d}".format(len(vocab_processor.vocabulary_)))
-	print("Train/Dev split: {:d}/{:d}".format(len(y_train), len(y_val)))
-	return x_train, y_train, x_val, y_val
+    X = np.zeros((temp_X.shape[0], temp_X.shape[1], temp_X.shape[1], 1))
 
 
-x_train, y_train, x_val, y_val = data_process()
-x_train = x_train.reshape((x_train.shape[0], x_train.shape[1], 1))
-x_val = x_val.reshape((x_val.shape[0], x_val.shape[1], 1))
+    for i in range(len(temp_X)):
+        for j in range(len(temp_X[i])):
+            X[i, j] = temp_X[i].reshape((temp_X.shape[1], 1))
 
+    print(X.shape)
+
+    # Randomly shuffle data
+    np.random.seed(10)
+    shuffle_indices = np.random.permutation(np.arange(len(y)))
+    x_shuffled = X[shuffle_indices]
+    y_shuffled = y[shuffle_indices] 
+
+    # Split train/test set
+    # TODO: This is very crude, should use cross-validation
+    dev_sample_index = -1 * int(0.1 * float(len(y)))
+    x_train, x_val = x_shuffled[:dev_sample_index], x_shuffled[dev_sample_index:]
+    y_train, y_val = y_shuffled[:dev_sample_index], y_shuffled[dev_sample_index:]
+
+    print("Vocabulary Size: {:d}".format(len(vocab_processor.vocabulary_)))
+    print("Train/Dev split: {:d}/{:d}".format(len(y_train), len(y_val)))
+    return x_train, y_train, vocab_processor, x_val, y_val
+
+
+x_train, y_train, vocab_processor, x_val, y_val = data_process()
+
+print(x_train[1])
 import numpy as np
 import keras
 import tensorflow as tf
@@ -71,13 +78,15 @@ def bias_init(shape, dtype='float'):
     return K.constant(value=0.1, shape=shape, dtype=dtype)
 
 
-def CNN_baseline(x_train, filter_size):
+def CNN_baseline(x_train, filter_size, input_dim):
     model=Sequential()
-    model.add(Embedding(input_dim=x_train.shape[0], output_dim=128, input_length=x_train.shape[1],
+    '''
+    model.add(Embedding(input_dim=input_dim, output_dim=128,
+                        input_length=x_train.shape[0],
                         embeddings_initializer='uniform'))
-
+    '''
     model.add(Conv2D(filters=128, kernel_size=(filter_size,filter_size),strides=(1,1), padding='valid',
-                     activation='relu'))
+                     activation='relu', input_shape=(51,51, 1)))
 
     model.add(MaxPooling2D(pool_size=(x_train.shape[1]-filter_size+1, 1), strides=(1, 1),padding='valid'))
 
@@ -92,6 +101,7 @@ def CNN_baseline(x_train, filter_size):
                   metrics=['accuracy'])
     return model
 
-model = CNN_baseline(x_train, 3)
-model.fit(x_train, y_train, x_val, y_val)
+model = CNN_baseline(x_train, 3, len(vocab_processor.vocabulary_))
+model.fit(x_train, y_train, batch_size=128, epochs=200, validation_data=(x_val,
+                                                                         y_val))
 
