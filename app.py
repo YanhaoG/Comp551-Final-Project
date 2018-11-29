@@ -52,12 +52,13 @@ def data_process():
 	y_train, y_val = y_shuffled[:dev_sample_index], y_shuffled[dev_sample_index:]
 
 	print("Vocabulary Size: {:d}".format(len(vocab_processor.vocabulary_)))
-	print("Train/Dev split: {:d}/{:d}".format(len(y_train), len(y_dev)))
+	print("Train/Dev split: {:d}/{:d}".format(len(y_train), len(y_val)))
 	return x_train, y_train, x_val, y_val
 
 
 x_train, y_train, x_val, y_val = data_process()
-
+x_train = x_train.reshape((x_train.shape[0], x_train.shape[1], 1))
+x_val = x_val.reshape((x_val.shape[0], x_val.shape[1], 1))
 
 import numpy as np
 import keras
@@ -76,13 +77,13 @@ def CNN_baseline(x_train, filter_size):
                         embeddings_initializer='uniform'))
 
     model.add(Conv2D(filters=128, kernel_size=(filter_size,filter_size),strides=(1,1), padding='valid',
-                     activation='relu',bias_initializer=bias_init(shape=128)))
+                     activation='relu'))
 
     model.add(MaxPooling2D(pool_size=(x_train.shape[1]-filter_size+1, 1), strides=(1, 1),padding='valid'))
 
     model.add(Flatten())
 
-    model.add(Dense(units=2, bias_regularizer=bias_init(shape=128)))
+    model.add(Dense(units=2))
 
     model.add(Dropout(0.5))
 
@@ -91,4 +92,6 @@ def CNN_baseline(x_train, filter_size):
                   metrics=['accuracy'])
     return model
 
+model = CNN_baseline(x_train, 3)
+model.fit(x_train, y_train, x_val, y_val)
 
