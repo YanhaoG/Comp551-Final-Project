@@ -57,3 +57,38 @@ def data_process():
 
 
 x_train, y_train, x_val, y_val = data_process()
+
+
+import numpy as np
+import keras
+import tensorflow as tf
+from keras import backend as K
+from keras.layers import Dense, Conv2D, Embedding, Dropout, MaxPooling2D, Flatten
+from keras.models import Sequential
+
+def bias_init(shape, dtype='float'):
+    return K.constant(value=0.1, shape=shape, dtype=dtype)
+
+
+def CNN_baseline(x_train, filter_size):
+    model=Sequential()
+    model.add(Embedding(input_dim=x_train.shape[0], output_dim=128, input_length=x_train.shape[1],
+                        embeddings_initializer='uniform'))
+
+    model.add(Conv2D(filters=128, kernel_size=(filter_size,filter_size),strides=(1,1), padding='valid',
+                     activation='relu',bias_initializer=bias_init(shape=128)))
+
+    model.add(MaxPooling2D(pool_size=(x_train.shape[1]-filter_size+1, 1), strides=(1, 1),padding='valid'))
+
+    model.add(Flatten())
+
+    model.add(Dense(units=2, bias_regularizer=bias_init(shape=128)))
+
+    model.add(Dropout(0.5))
+
+    model.compile(loss=keras.losses.categorical_crossentropy,
+                  optimizer=keras.optimizers.Adam(lr=0.001),
+                  metrics=['accuracy'])
+    return model
+
+
